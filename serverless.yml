@@ -1,0 +1,106 @@
+org: kinycx
+app: serverless-flask
+# serverless.yml
+
+service: serverless-flask
+
+plugins:
+  - serverless-python-requirements
+  - serverless-wsgi
+
+# WSGI is a simple calling convention for web servers to forward requests to web applications or frameworks written in python
+custom:
+  tableName: 'users-table-${self:provider.stage}'
+  wsgi:
+
+    # App entrypoint is app.app, which means the app object in the app.py module
+    app: app.app
+    packRequirements: false
+
+  pythonRequirements:
+    dockerizePip: non-linux
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: dev
+  region: us-east-1
+
+  # Adding IAM permissions for our functions under the iamRoleStatements
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["UsersDynamoDBTable", "Arn" ] }
+
+  # Passing the table name as the environment variable USERS_TABLE in the environment
+  environment:
+    USERS_TABLE: ${self:custom.tableName}
+
+	
+functions:
+	
+  createUser:
+
+  	# The handler is handler function from the wsgi_handler module. 
+    # Note that this module will be added to our deployment package by the serverless-wsgi plugin. 
+    handler: wsgi_handler.handler
+
+    # All of the HTTP routing logic will be done inside the Flask application.
+    # Events are objects, which can contain event-specific information.
+
+    # The events property is an array, because it's possible for functions to be triggered by multiple events
+
+    # Is it possible to set multiple Events per Function, as long as that is supported by AWS.
+    events:
+
+      # POST /users --> for creating a new User
+      - http: 'POST /users'
+
+  getUserById:
+	
+    handler: wsgi_handler.handler
+    events:
+	
+      # GET /users/:userId --> for getting a User
+      - http: 'GET /users/{proxy+}'
+	
+
+
+# All Resources are other AWS infrastructure resources which the AWS Lambda functions in your Service depend on, like AWS DynamoDB or AWS S3.
+
+# {Function Name}{Cloud Formation Resource Type}{Resource Name}{SequentialID, instanceId or Random String}
+
+#     Function Name - This is optional for Resources that should be recreated when the function name gets changed. Those resources are also called function bound
+#     Cloud Formation Resource Type - E.g., S3Bucket
+#     Resource Name - An identifier for the specific resource, e.g. for an S3 Bucket the configured bucket name.
+#     SequentialID, instanceId or Random String - For a few resources we need to add an optional sequential id, the Serverless instanceId (accessible via ${sls:instanceId}) or a random string to identify them
+
+resources:
+# resources are added into CloudFormation stack upon serverless deploy
+  Resources:
+  # Provisioning the table in the resources section using AWS CloudFormation syntax
+    UsersDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: userId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
+        
+# The last thing we need to do is handling our Python packages. The serverless-python-requirements plugin looks for a requirements.txt 
+# file in our working directory and installs them into our deployment package. Let's build that requirements.txt file.
