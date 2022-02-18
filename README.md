@@ -38,9 +38,9 @@ Taking for granted that the reader has linked IAM with AWS CLI, and has already 
 	
 > sls deploy
 
-Since we're storing Users in a database. We want to store them by userId, which is a unique identifier for a particular user.
+Since we're storing Users in a database we want to store them by userId, which is a unique identifier for a particular user.
 
-I'll use curl for these examples. Set the DOMAIN variable to your unique domain and base path so it's easier to reuse:
+I'll use curl for these examples.
 
 Set the DOMAIN variable to your unique domain and base path so it's easier to reuse:
 
